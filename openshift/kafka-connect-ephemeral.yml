@@ -1,0 +1,241 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: kafka-connect-ephemeral-template
+message: |-
+  The following service(s) have been created in your project: ${KAFKACONNECT_SERVICE_NAME}.
+
+   Kafka Connect Port: ${KAFKACONNECT_SERVICE_NAME}:9092
+metadata:
+  annotations:
+    description: |-
+      A distributed streaming platform, without persistent storage.
+
+      WARNING: Any data stored will be lost upon pod destruction. Only use this template for testing
+    openshift.io/display-name: Kafka Connect (Ephemeral)
+    tags: database,kafka
+    template.openshift.io/documentation-url: https://docs.confluent.io/current/connect/index.html
+    template.openshift.io/long-description: This template provides a standalone Kafka Connect
+      data stream processing server.  The data is not stored on persistent storage,
+      so any restart of the service will result in all data being lost.
+    template.openshift.io/provider-display-name: SDP Team
+    template.openshift.io/support-url: https://svcmgr.cdc.gov/
+  creationTimestamp: null
+  name: kafka-connect-ephemeral
+objects:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: null
+    name: '${KAFKACONNECT_SERVICE_NAME}'
+  spec:
+    ports:
+    - name: connect
+      protocol: TCP
+      port: 9092
+      targetPort: 9092
+    selector:
+      name: '${KAFKACONNECT_SERVICE_NAME}'
+    sessionAffinity: None
+    type: ClusterIP
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    creationTimestamp: null
+    name: '${KAFKACONNECT_SERVICE_NAME}'
+  spec:
+    replicas: 1
+    selector:
+      name: '${KAFKACONNECT_SERVICE_NAME}'
+    strategy:
+      tpe: Recreate
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          name: '${KAFKACONNECT_SERVICE_NAME}'
+      spec:
+        containers:
+        - capabilities: {}
+          env:
+          - name: CONNECT_BOOTSTRAP_SERVERS
+            value: "${BOOTSTRAP_SERVERS}"
+          - name: CONNECT_GROUP_ID
+            value: "${GROUP_ID}"
+          - name: CONNECT_CONFIG_STORAGE_TOPIC
+            value: "${CONFIG_STORAGE_TOPIC}"
+          - name: CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR
+            value: "${CONFIG_STORAGE_REPLICATION_FACTOR}"
+          - name: CONNECT_OFFSET_STORAGE_TOPIC
+            value: "${OFFSET_STORAGE_TOPIC}"
+          - name: CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR
+            value: "${OFFSET_STORAGE_REPLICATION_FACTOR}"
+          - name: CONNECT_STATUS_STORAGE_TOPIC
+            value: "${STATUS_STORAGE_TOPIC}"
+          - name: CONNECT_STATUS_STORAGE_REPLICATION_FACTOR
+            value: "${STATUS_STORAGE_REPLICATION_FACTOR}"
+          - name: CONNECT_KEY_CONVERTER
+            value: "${KEY_CONVERTER}"
+          - name: CONNECT_VALUE_CONVERTER
+            value: "${VALUE_CONVERTER}"
+          - name: CONNECT_INTERNAL_KEY_CONVERTER
+            value: "${INTERNAL_KEY_CONVERTER}"
+          - name: CONNECT_INTERNAL_VALUE_CONVERTER
+            value: "${INTERNAL_VALUE_CONVERTER}"
+          - name: CONNECT_REST_ADVERTISED_HOST_NAME
+            value: "${REST_ADVERTISED_HOST_NAME}"
+          image: ' '
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            initialDelaySeconds: 30
+            tcpSocket:
+              port: 9092
+            timeoutSeconds: 1
+          name: kafka-connect
+          ports:
+          - containerPort: 8083
+            protocol: TCP
+          - containerPort: 9092
+            protocol: TCP
+          readinessProbe:
+            tcpSocket:
+              port: 9092
+            timeoutSeconds: 1
+          resources:
+            limits:
+              memory: ${MEMORY_LIMIT}
+          securityContext:
+            capabilities: {}
+            privileged: false
+          terminationMessagePath: /dev/termination-log
+          volumeMounts:
+          - mountPath: /etc/kafka-connect/jars
+            name: '${KAFKACONNECT_SERVICE_NAME}-jars'
+          - mountPath: /etc/kafka-connect/secrets
+            name: '${KAFKACONNECT_SERVICE_NAME}-secrets'
+          - mountPath: /etc/kafka/secrets
+            name: '${KAFKACONNECT_SERVICE_NAME}-kafkasecrets'
+          - mountPath: /var/lib/kafka/data
+            name: '${KAFKACONNECT_SERVICE_NAME}-kafkadata'
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        volumes:
+        - emptyDir:
+            medium: ''
+          name: '${KAFKACONNECT_SERVICE_NAME}-jars'
+        - emptyDir:
+            medium: ''
+          name: '${KAFKACONNECT_SERVICE_NAME}-secrets'
+        - emptyDir:
+            medium: ''
+          name: '${KAFKACONNECT_SERVICE_NAME}-kafkasecrets'
+        - emptyDir:
+            medium: ''
+          name: '${KAFKACONNECT_SERVICE_NAME}-kafkadata'
+    triggers:
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - kafka-connect
+        from:
+          kind: ImageStreamTag
+          name: ${KAFKACONNECT_IMAGE}:${KAFKACONNECT_VERSION}
+          namespace: ${NAMESPACE}
+        lastTriggerImage: ""
+      type: ImageChange
+    - type: ConfigChange
+  status: {}
+parameters:
+- name: MEMORY_LIMIT
+  displayName: Memory Limit
+  description: Maximum amount of memory the container can use.
+  required: true
+  value: 512Mi
+- name: NAMESPACE
+  displayName: Namespace
+  description: The OpenShift Namespace where the ImageStream resides.
+  value: openshift
+- name: KAFKACONNECT_SERVICE_NAME
+  displayName: Kafka Connect Service Name
+  description: The name of the OpenShift Service exposed for this instance.
+  required: true
+  value: kafkaconnect
+- name: KAFKACONNECT_IMAGE
+  displayName: Kafka Connect Image Name
+  description: The name of the Kafka Connect ImageStream to be used.
+  required: true
+  value: ocp-kafka-connect
+- name: KAFKACONNECT_VERSION
+  displayName: Version of the Kafka Connect Image
+  description: Version of the Kafka Connect image to be used (3.3 or latest)
+  required: true
+  value: "3.3"
+- name: BOOTSTRAP_SERVERS
+  displayName: Kafka Bootstrap Servers
+  description: A list of host/port pairs to use for establishing the initial connection to the Kafka cluster.
+  required: true
+  value: "kafka:9092"
+- name: GROUP_ID
+  displayName: Connect Cluster Group ID
+  description: A unique string that identifies the Connect cluster group this worker belongs to.
+  required: true
+  generate: expression
+  from: "[a-zA-Z0-9_]{12}"
+- name: CONFIG_STORAGE_TOPIC
+  displayName: Configuration Topic Name
+  description: The name of the topic in which to store connector and task configuration data. This must be the same for all workers with the same group.id.
+  required: true
+  generate: expression
+  from: "conf[a-zA-Z0-9_]{8}"
+- name: CONFIG_STORAGE_REPLICATION_FACTOR
+  displayName: Configuration Topic Replication Factor
+  description: The number of replicas for configuration data.
+  required: true
+  value: "1"
+- name: OFFSET_STORAGE_TOPIC
+  displayName: Offset Topic Name
+  description: The name of the topic in which to store offset data for connectors. This must be the same for all workers with the same group.id.
+  required: true
+  generate: expression
+  from: "offset[a-zA-Z0-9_]{8}"
+- name: OFFSET_STORAGE_REPLICATION_FACTOR
+  displayName: Offset Topic Replication Factor
+  description: The number of replicas for offset data.
+  required: true
+  value: "1"
+- name: STATUS_STORAGE_TOPIC
+  displayName: Status Topic Name
+  description: The name of the topic in which to store state for connectors. This must be the same for all workers with the same group.id.
+  required: true
+  generate: expression
+  from: "status[a-zA-Z0-9_]{8}"
+- name: STATUS_STORAGE_REPLICATION_FACTOR
+  displayName: Status Topic Replication Factor
+  description: The number of replicas for status data.
+  required: true
+  value: "1"
+- name: KEY_CONVERTER
+  displayName: Converter Class for Keys
+  description: This controls the format of the data that will be written to Kafka for source connectors or read from Kafka for sink connectors.
+  required: true
+  value: "org.apache.kafka.connect.json.JsonConverter"
+- name: VALUE_CONVERTER
+  displayName: Converter Class for Values
+  description: This controls the format of the data that will be written to Kafka for source connectors or read from Kafka for sink connectors.
+  required: true
+  value: "org.apache.kafka.connect.json.JsonConverter"
+- name: INTERNAL_KEY_CONVERTER
+  displayName: Converter Class for Internal Keys
+  description: Converter class for internal keys that implements the Converter interface.
+  required: true
+  value: "org.apache.kafka.connect.json.JsonConverter"
+- name: INTERNAL_VALUE_CONVERTER
+  displayName: Converter Class for Internal Values
+  description: Converter class for internal values that implements the Converter interface.
+  required: true
+  value: "org.apache.kafka.connect.json.JsonConverter"
+- name: REST_ADVERTISED_HOST_NAME
+  displayName: Advertised Host Name
+  description: Advertised host name is required for starting up the Docker image because it is important to think through how other clients are going to connect to Connect REST API.
+  required: true
+  value: "kafkaconnect"

@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ImageStream
+metadata:
+  annotations:
+    openshift.io/display-name: Kafka Connect
+  name: ocp-kafka-connect
+spec:
+  dockerImageRepository: "confluentinc/cp-kafka-connect"
+  tags:
+  - annotations:
+      description: Provides a Confluent Inc. Kafka Connect 3.3.0 image. For more information
+        about using this image, see kafkaconnect-17-8nhch.
+      openshift.io/display-name: Kafka Connect 3.3.0
+      tags: kafka-connect
+      version: "3.3.0"
+    from:
+      kind: DockerImage
+      name: confluentinc/cp-kafka-connect:3.3.0
+    importPolicy: {}
+    name: "3.3.0"
+  - annotations:
+      description: Provides a Confluent Inc. Kafka Connect 3.3.x image. For more information
+        about using this image, see kafkaconnect-17-8nhch.
+      openshift.io/display-name: Kafka Connect 3.3.x
+      tags: kafka-connect
+      version: "3.3.x"
+    from:
+      kind: ImageStreamTag
+      name: "3.3.0"
+    importPolicy: {}
+    name: "3.3"
+  - annotations:
+      description: Provides a Confluent Inc. Kafka Connect image. For more information
+        about using this image, see kafkaconnect-17-8nhch.
+      openshift.io/display-name: Kafka Connect (Latest)
+      tags: kafka-connect
+      version: "3.3.x"
+    from:
+      kind: DockerImage
+      name: confluentinc/cp-kafka-connect:latest
+    importPolicy: {}
+    name: latest
